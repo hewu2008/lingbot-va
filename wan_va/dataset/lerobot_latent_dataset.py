@@ -47,8 +47,13 @@ def construct_lerobot_multi_processor(config,
     )
     repo_list = recursive_find_file(config.dataset_path, 'info.json')
     repo_list = [v.split('/meta/info.json')[0] for v in repo_list]
-    with Pool(num_init_worker) as pool:
-        datasets_out_lst = pool.map(construct_func, repo_list)
+    for repo in repo_list:
+        try:
+            dataset = construct_lerobot(repo, config=config)
+            datasets_out_lst.append(dataset)
+        except Exception as e:
+            print(f"Failed to load dataset from {repo}: {e}")
+            raise e
                 
     return datasets_out_lst
 
