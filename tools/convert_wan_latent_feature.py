@@ -273,7 +273,6 @@ def main():
             device=device, dtype=dtype,
             text_encoder_device=text_encoder_device,
         )
-        break
     
     print("Latent extraction completed successfully!")
 
