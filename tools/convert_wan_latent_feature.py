@@ -6,9 +6,9 @@ import sys
 from pathlib import Path
 
 import cv2
+import av
 import numpy as np
 import torch
-import torch.nn.functional as F
 from tqdm import tqdm
 
 from wan_va.modules.utils import load_vae, load_text_encoder, load_tokenizer
@@ -31,30 +31,27 @@ def discover_camera_keys(dataset_dir: Path) -> list:
 
 
 def extract_video_frames(video_path: str, target_fps: int = 10) -> tuple:
-    params = [cv2.CAP_PROP_HW_ACCELERATION, cv2.VIDEO_ACCELERATION_NONE]
-    cap = cv2.VideoCapture(str(video_path), cv2.CAP_ANY, params)
-    if not cap.isOpened():
-        raise RuntimeError(f"Failed to open video: {video_path}")
+    container = av.open(str(video_path))
+    stream = container.streams.video[0]
     
-    ori_fps = cap.get(cv2.CAP_PROP_FPS)
-    video_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    video_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    # Extract metadata using software decoder
+    ori_fps = float(stream.average_rate)
+    video_height = stream.height
+    video_width = stream.width
+    total_frames = stream.frames if stream.frames > 0 else 0
     
     frame_interval = max(1, int(ori_fps / target_fps))
     frames = []
     frame_ids = []
     
-    for i in range(total_frames):
-        ret, frame = cap.read()
-        if not ret:
-            break
-        if i % frame_interval == 0:
-            frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-            frame_ids.append(i)
-    
-    cap.release()
-    
+    # Loops through video packets and handles software decoding seamlessly
+    for idx, frame in enumerate(container.decode(video=0)):
+        if idx % frame_interval == 0:
+            # PyAV frames can be converted directly to standard RGB NumPy arrays
+            frames.append(frame.to_ndarray(format='rgb24'))
+            frame_ids.append(idx)
+            
+    container.close()
     return frames, frame_ids, ori_fps, video_height, video_width
 
 
@@ -71,20 +68,31 @@ def encode_video_to_latent(
     
     device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
-    video_tensor = torch.from_numpy(np.stack(frames)).float().permute(3, 0, 1, 2)
-    video_tensor = F.interpolate(video_tensor, size=(height, width), mode='bilinear', align_corners=False)
-    video_tensor = video_tensor.unsqueeze(0) / 255.0 * 2.0 - 1.0
+    # Stack frames to create a tensor with shape: [Frames, Height, Width, Channels]
+    video_tensor = torch.from_numpy(np.stack(frames)).float()
+    
+    # Re-arrange to [Frames, Channels, Height, Width] so F.interpolate handles 2D spatial scaling correctly
+    video_tensor = video_tensor.permute(0, 3, 1, 2)
+    video_tensor = torch.nn.functional.interpolate(video_tensor, size=(height, width), mode='bilinear', align_corners=False)
+    
+    # Re-arrange into Wan2.2 VAE's expected 5D shape: [Batch(1), Channels, Frames, Height, Width]
+    video_tensor = video_tensor.permute(1, 0, 2, 3).unsqueeze(0)
+    
+    # Normalize pixel inputs to [-1, 1] range
+    video_tensor = video_tensor / 255.0 * 2.0 - 1.0
     video_tensor = video_tensor.to(device).to(dtype)
     
     with torch.no_grad():
         enc_out = vae.encode(video_tensor).latent_dist.sample()
         
-        latents_mean = torch.tensor(vae.config.latents_mean).to(enc_out.device)
-        latents_std = torch.tensor(vae.config.latents_std).to(enc_out.device)
+        # Reshape to [1, 48, 1, 1, 1] to properly broadcast across [B, C, F, H, W]
+        latents_mean = torch.tensor(vae.config.latents_mean).to(enc_out.device).view(1, -1, 1, 1, 1)
+        latents_std = torch.tensor(vae.config.latents_std).to(enc_out.device).view(1, -1, 1, 1, 1)
         mu_norm = ((enc_out.float() - latents_mean) * (1.0 / latents_std)).to(dtype)
     
     B, C, F, H, W = mu_norm.shape
     
+    # Flatten sequence for downstream transformers
     latent_flat = mu_norm.view(B, C, -1).permute(0, 2, 1).squeeze(0)
     
     return {
