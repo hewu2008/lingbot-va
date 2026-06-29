@@ -30,26 +30,20 @@ def discover_camera_keys(dataset_dir: Path) -> list:
     return sorted(camera_keys)
 
 
-def extract_video_frames(video_path: str, target_fps: int = 10) -> tuple:
+def extract_video_frames(video_path: str) -> tuple:
     container = av.open(str(video_path))
     stream = container.streams.video[0]
     
-    # Extract metadata using software decoder
     ori_fps = float(stream.average_rate)
     video_height = stream.height
     video_width = stream.width
-    total_frames = stream.frames if stream.frames > 0 else 0
     
-    frame_interval = max(1, int(ori_fps / target_fps))
     frames = []
     frame_ids = []
     
-    # Loops through video packets and handles software decoding seamlessly
     for idx, frame in enumerate(container.decode(video=0)):
-        if idx % frame_interval == 0:
-            # PyAV frames can be converted directly to standard RGB NumPy arrays
-            frames.append(frame.to_ndarray(format='rgb24'))
-            frame_ids.append(idx)
+        frames.append(frame.to_ndarray(format='rgb24'))
+        frame_ids.append(idx)
             
     container.close()
     return frames, frame_ids, ori_fps, video_height, video_width
@@ -147,7 +141,6 @@ def process_episode(
     tokenizer,
     text_encoder,
     camera_keys: list,
-    target_fps: int = 10,
     device: torch.device = None,
     dtype: torch.dtype = torch.bfloat16,
     text_encoder_device: torch.device = None,
@@ -172,7 +165,7 @@ def process_episode(
             print(f"Video not found: {video_path}")
             continue
         
-        frames, frame_ids, ori_fps, video_height, video_width = extract_video_frames(str(video_path), target_fps)
+        frames, frame_ids, ori_fps, video_height, video_width = extract_video_frames(str(video_path))
         
         if not frames:
             print(f"No frames extracted from: {video_path}")
@@ -212,7 +205,7 @@ def process_episode(
                 'frame_ids': segment_frame_ids,
                 'start_frame': start_frame,
                 'end_frame': end_frame,
-                'fps': target_fps,
+                'fps': ori_fps,
                 'ori_fps': ori_fps,
             }
             
@@ -230,7 +223,7 @@ def main():
     parser = argparse.ArgumentParser(description='Extract Wan2.2 VAE latents from LeRobot dataset videos')
     parser.add_argument('--dataset_dir', type=str, required=True, help='Path to LeRobot dataset directory')
     parser.add_argument('--model_path', type=str, required=True, help='Path to Wan2.2 pretrained model')
-    parser.add_argument('--target_fps', type=int, default=10, help='Target FPS for latent extraction')
+
     parser.add_argument('--dtype', type=str, default='bfloat16', choices=['float32', 'bfloat16'], help='Data type')
     parser.add_argument('--enable_offload', action='store_true', help='Offload text_encoder to CPU to save VRAM')
     args = parser.parse_args()
@@ -260,7 +253,7 @@ def main():
         camera_keys = ['observation.images.cam_high', 'observation.images.cam_left_wrist', 'observation.images.cam_right_wrist']
     print(f"Discovered camera keys: {camera_keys}")
     
-    episodes_file = dataset_dir / 'meta' / 'episodes_lingbot.jsonl'
+    episodes_file = dataset_dir / 'meta' / 'episodes.jsonl'
     episodes = load_episodes(str(episodes_file))
     print(f"Loaded {len(episodes)} episodes")
     
@@ -269,7 +262,6 @@ def main():
             episode, dataset_dir,
             vae, tokenizer, text_encoder,
             camera_keys,
-            target_fps=args.target_fps,
             device=device, dtype=dtype,
             text_encoder_device=text_encoder_device,
         )
