@@ -349,6 +349,7 @@ class HDF5ToLeRobotConverter:
                             img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
                         elif img.shape[2] == 4:
                             img = img[:, :, :3]
+                        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
                         frame[feature_key] = img
                 
                 # Add merged state (concatenate all state paths on axis=0)
