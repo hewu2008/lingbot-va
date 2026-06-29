@@ -14,6 +14,23 @@ from tqdm import tqdm
 from lerobot.datasets.lerobot_dataset import LeRobotDataset, LeRobotDatasetMetadata
 from lerobot.datasets.utils import write_task, write_episode, write_stats
 
+TARGET_SIZE = 256
+
+def resize_and_pad(img: np.ndarray, target_size: int = TARGET_SIZE) -> np.ndarray:
+    h, w = img.shape[:2]
+    max_dim = max(h, w)
+    scale = target_size / max_dim
+    new_w, new_h = int(w * scale), int(h * scale)
+    
+    img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
+    
+    pad_w = (target_size - new_w) // 2
+    pad_h = (target_size - new_h) // 2
+    img = cv2.copyMakeBorder(img, pad_h, pad_h, pad_w, pad_w, cv2.BORDER_CONSTANT, value=(0, 0, 0))
+    
+    return img
+
+
 def show_lerobot_record_data(local_root, show_field_ranges=False):
     dataset = LeRobotDataset(local_root, video_backend="pyav")
     print("LeRobot record data:", dataset)
@@ -226,6 +243,7 @@ class HDF5ToLeRobotConverter:
             if camera_path.endswith("color"):
                 camera_name = reader.get_camera_name_by_path(camera_path)
                 camera_shape = reader.camera_shapes.get(camera_path)
+                camera_shape = (TARGET_SIZE, TARGET_SIZE, 3)
                 feature_key = f"observation.images.{camera_name}"
                 features[feature_key] = {
                     "dtype": "video",
@@ -350,6 +368,7 @@ class HDF5ToLeRobotConverter:
                         elif img.shape[2] == 4:
                             img = img[:, :, :3]
                         img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+                        img = resize_and_pad(img)
                         frame[feature_key] = img
                 
                 # Add merged state (concatenate all state paths on axis=0)
