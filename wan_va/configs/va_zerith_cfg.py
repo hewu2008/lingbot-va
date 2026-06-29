@@ -57,7 +57,7 @@ for i, j in enumerate(va_zerith_cfg.used_action_channel_ids):
 va_zerith_cfg.inverse_used_action_channel_ids = inverse_used_action_channel_ids
 
 va_zerith_cfg.action_norm_method = 'quantiles'
-va_robotwin_cfg.norm_stat = {
+va_zerith_cfg.norm_stat = {
     "q01": [
         -0.4602, 0.6474, 0.0857, -0.3200, -0.2461, -0.2713, -0.9852, 
         -0.2651, 0.6373, 0.0517, -0.5161, -0.2174, -0.2292, -0.9906,
