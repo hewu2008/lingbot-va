@@ -10,6 +10,9 @@ from .va_demo_i2va import va_demo_i2va_cfg
 from .va_libero_cfg import va_libero_cfg
 from .va_libero_train_cfg import va_libero_train_cfg
 from .va_libero_i2va import va_libero_i2va_cfg
+from .va_zerith_cfg import va_zerith_cfg
+from .va_zerith_train_cfg import va_zerith_train_cfg
+from .va_zerith_i2va_cfg import va_zerith_i2va_cfg
 
 VA_CONFIGS = {
     'robotwin': va_robotwin_cfg,
@@ -23,4 +26,7 @@ VA_CONFIGS = {
     'libero': va_libero_cfg,
     'libero_train': va_libero_train_cfg,
     'libero_i2av': va_libero_i2va_cfg,
+    'zerith': va_zerith_cfg,
+    'zerith_train': va_zerith_train_cfg,
+    'zerith_i2av': va_zerith_i2va_cfg,
 }
