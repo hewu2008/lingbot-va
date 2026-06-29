@@ -266,6 +266,10 @@ class LatentLeRobotDataset(LeRobotDataset):
             left_action = get_relative_pose(action[:, :7])
             right_action = get_relative_pose(action[:, 8:15])
             action = np.concatenate([left_action, action[:, 7:8], right_action, action[:, 15:16]], axis=1)
+        elif self.config.env_type == 'zerith_tshape':
+            left_action = action[:, 18:25]
+            right_action = action[:, 25:32]
+            action = np.concatenate([left_action, action[:, 16:17], right_action, action[:, 17:18]], axis=1)
         action = np.pad(action, pad_width=((frame_stride * 4, 0), (0, 0)), mode='constant', constant_values=0)
 
         latent_frame_num = (len(latent_frame_ids) - 1) // 4 + 1

@@ -12,7 +12,7 @@ va_zerith_cfg.wan22_pretrained_model_name_or_path = "/home/jszn/hewu/model_zoo/l
 
 va_zerith_cfg.attn_window = 30
 va_zerith_cfg.frame_chunk_size = 4
-va_zerith_cfg.env_type = 'none'
+va_zerith_cfg.env_type = 'zerith_tshape'
 
 va_zerith_cfg.height = 256
 va_zerith_cfg.width = 256
@@ -48,7 +48,8 @@ va_zerith_cfg.action_snr_shift = 1.0
 # 注意: used_action_channel_ids 是在30D对齐空间中的索引(0-29), 不是HDF5索引!
 # 
 # 当前使用: 双臂EEF (0-13) + 夹爪 (28, 29) = 16维
-va_zerith_cfg.used_action_channel_ids = list(range(0, 14)) + [28, 29]
+va_zerith_cfg.used_action_channel_ids = list(range(0, 7)) + list(range(
+    28, 29)) + list(range(7, 14)) + list(range(29, 30))
 inverse_used_action_channel_ids = [len(va_zerith_cfg.used_action_channel_ids)
                                    ] * va_zerith_cfg.action_dim
 for i, j in enumerate(va_zerith_cfg.used_action_channel_ids):
@@ -56,20 +57,15 @@ for i, j in enumerate(va_zerith_cfg.used_action_channel_ids):
 va_zerith_cfg.inverse_used_action_channel_ids = inverse_used_action_channel_ids
 
 va_zerith_cfg.action_norm_method = 'quantiles'
-# norm_stat 需要根据实际数据计算
-# 当前使用: 双臂EEF (14维, 索引0-13) + 夹爪 (2维, 索引28-29)
-# 其余14维 (索引14-27, 即关节) 填充为0
-va_zerith_cfg.norm_stat = {
-    "q01": (
-        [-0.5, -0.5, -0.5, -3.14, -0.5, -0.5, -0.5,  # 左臂 EEF (x, y, z, rx, ry, rz, rw)
-         -0.5, -0.5, -0.5, -3.14, -0.5, -0.5, -0.5,  # 右臂 EEF
-         0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,  # 关节 (14维, 待替换)
-         0.0, 0.0]  # 夹爪
-    ),
-    "q99": (
-        [0.5, 0.5, 0.5, 3.14, 0.5, 0.5, 0.5,  # 左臂 EEF
-         0.5, 0.5, 0.5, 3.14, 0.5, 0.5, 0.5,  # 右臂 EEF
-         0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,  # 关节 (14维, 待替换)
-         100.0, 100.0]  # 夹爪
-    ),
+va_robotwin_cfg.norm_stat = {
+    "q01": [
+        -0.06172713458538055, -3.6716461181640625e-05, -0.08783501386642456,
+        -1, -1, -1, -1, -0.3547105032205582, -1.3113021850585938e-06,
+        -0.11975435614585876, -1, -1, -1, -1
+    ] + [0.] * 16,
+    "q99": [
+        0.3462600058317184, 0.39966784834861746, 0.14745532035827624, 1, 1, 1,
+        1, 0.034201726913452024, 0.39142737388610793, 0.1792279863357542, 1, 1,
+        1, 1
+    ] + [0.] * 14 + [1.0, 1.0],
 }
