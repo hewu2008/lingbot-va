@@ -221,7 +221,9 @@ class LatentLeRobotDataset(LeRobotDataset):
                 cur_path / f"episode_{episode_index:06d}_{start_frame}_{end_frame}.pth"
             )
             assert os.path.exists(latent_file)
-            latent_data = torch.load(latent_file, weights_only=False)
+            latent_data = torch.load(latent_file, weights_only=False, map_location='cpu')
+            if isinstance(latent_data, dict):
+                latent_data = {k: (v.detach() if isinstance(v, torch.Tensor) else v) for k, v in latent_data.items()}
             out[key] = latent_data
         
         return self._flatten_latent_dict(out)
@@ -324,7 +326,7 @@ if __name__ == '__main__':
     from wan_va.configs import VA_CONFIGS
     from tqdm import tqdm
     dset = MultiLatentLeRobotDataset(
-        VA_CONFIGS['demo_train']
+        VA_CONFIGS['zerith_train']
     )
     for key, value in dset[0].items():
         if isinstance(value, torch.Tensor):
